@@ -1,0 +1,38 @@
+{
+    "name": "peer-learning-backend",
+    "version": "1.0.0",
+    "description": "AI Driven Peer Learning Recommendation System",
+    "main": "src/index.ts",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "db:push": "prisma db push",
+        "db:generate": "prisma generate"
+    },
+    "dependencies": {
+        "@clerk/express": "^1.7.73",
+        "@prisma/client": "^5.10.0",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.5",
+        "express": "^4.18.3",
+        "express-rate-limit": "^8.2.1",
+        "multer": "^2.0.2",
+        "openai": "^6.23.0",
+        "pdf-parse": "^1.1.1"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.17",
+        "@types/express": "^4.17.21",
+        "@types/multer": "^2.0.0",
+        "@types/node": "^20.19.33",
+        "@types/pdf-parse": "^1.1.5",
+        "prisma": "^5.10.0",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.7.1",
+        "typescript": "^5.3.3"
+    },
+    "prisma": {
+        "seed": "tsx prisma/seed.ts"
+    }
+}

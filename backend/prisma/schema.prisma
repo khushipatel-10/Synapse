@@ -1,0 +1,330 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  clerkId             String?              @unique
+  name                String
+  major               String?
+  year                String?
+  availability        Json?
+  createdAt           DateTime             @default(now())
+  conceptPerformances  ConceptPerformance[]
+  learningStates       LearningState[]
+  embeddings           UserEmbedding[]
+  networkEdgesAsA      NetworkEdge[]        @relation("EdgeUserA")
+  networkEdgesAsB      NetworkEdge[]        @relation("EdgeUserB")
+  hubMembers           HubMember[]
+  joinRequests         JoinRequest[]
+  connectionsSent      PeerConnection[]     @relation("Requester")
+  connectionsReceived  PeerConnection[]     @relation("Receiver")
+  messageParticipants  MessageParticipant[]
+  messagesSent         Message[]            @relation("MessageSender")
+  hubMessages          HubMessage[]         @relation("HubMessageSender")
+  hubSessionsCreated   HubSession[]         @relation("HubSessionCreator")
+  aiStudySessions      AIStudySession[]
+}
+
+model Course {
+  id                  String               @id @default(uuid())
+  name                String
+  code                String               @unique
+  createdAt           DateTime             @default(now())
+  conceptPerformances ConceptPerformance[]
+  learningStates      LearningState[]
+  userEmbeddings      UserEmbedding[]
+  courseSnapshots     CourseSnapshot[]
+  networkEdges        NetworkEdge[]
+  hubs                Hub[]
+  peerConnections     PeerConnection[]
+  aiStudySessions     AIStudySession[]
+}
+
+model LearningState {
+  id                   String   @id @default(uuid())
+  userId               String
+  courseId             String
+  confidenceSelf       Float
+  confidenceAi         Float
+  averageScore         Float
+  frustrationIndex     Float
+  improvementRate      Float
+  videoSuccessScore    Float
+  textSuccessScore     Float
+  practiceSuccessScore Float
+  conceptEntropy       Float
+  lastUpdated          DateTime @default(now())
+  createdAt            DateTime @default(now())
+  course               Course   @relation(fields: [courseId], references: [id])
+  user                 User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, courseId])
+}
+
+model ConceptPerformance {
+  id            String    @id @default(uuid())
+  userId        String
+  courseId      String
+  conceptName   String
+  masteryScore  Float
+  attempts      Int
+  lastPracticed DateTime?
+  createdAt     DateTime  @default(now())
+  course        Course    @relation(fields: [courseId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, courseId])
+}
+
+model UserEmbedding {
+  id        String                @id @default(uuid())
+  userId    String
+  courseId  String
+  embedding Unsupported("vector")
+  version   Int                   @default(1)
+  createdAt DateTime              @default(now())
+  course    Course                @relation(fields: [courseId], references: [id])
+  user      User                  @relation(fields: [userId], references: [id])
+
+  @@index([userId, courseId])
+}
+
+model CourseSnapshot {
+  id          String   @id @default(uuid())
+  courseId    String
+  weekIndex   Int
+  createdAt   DateTime @default(now())
+
+  edges       NetworkEdge[]
+  
+  course      Course   @relation(fields: [courseId], references: [id])
+
+  @@unique([courseId, weekIndex])
+}
+
+model NetworkEdge {
+  id                   String   @id @default(uuid())
+  snapshotId           String
+  courseId             String
+  userAId              String
+  userBId              String
+  similarityScore      Float
+  complementarityScore Float
+  finalScore           Float
+  direction            String
+  createdAt            DateTime @default(now())
+
+  snapshot             CourseSnapshot @relation(fields: [snapshotId], references: [id])
+  course               Course         @relation(fields: [courseId], references: [id])
+  userA                User           @relation("EdgeUserA", fields: [userAId], references: [id])
+  userB                User           @relation("EdgeUserB", fields: [userBId], references: [id])
+
+  @@index([snapshotId])
+  @@index([courseId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model UserPreferences {
+  id                 String   @id @default(uuid())
+  clerkUserId        String   @unique
+  studyPace          String
+  studyMode          String
+  learningStyle      String
+  goal               String
+  subjectInterests   Json
+  preferredGroupSize String
+  availability       Json?
+  offlineOrOnline    String   @default("online")
+  timezone           String   @default("UTC")
+  materialPreferred  String   @default("mixed")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Assessment {
+  id          String   @id @default(uuid())
+  subject     String
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+
+  questions   AssessmentQuestion[]
+  attempts    AssessmentAttempt[]
+}
+
+model AssessmentQuestion {
+  id            String   @id @default(uuid())
+  assessmentId  String
+  questionText  String
+  options       Json
+  correctAnswer String
+  conceptName   String
+  difficulty    String               @default("medium")
+  assessment    Assessment           @relation(fields: [assessmentId], references: [id])
+  responses     AssessmentResponse[]
+}
+
+model AssessmentAttempt {
+  id          String               @id @default(uuid())
+  clerkUserId String
+  assessmentId String
+  score       Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  assessment  Assessment           @relation(fields: [assessmentId], references: [id])
+  responses   AssessmentResponse[]
+}
+
+model AssessmentResponse {
+  id             String             @id @default(uuid())
+  attemptId      String
+  questionId     String
+  selectedAnswer String
+  isCorrect      Boolean
+  attempt        AssessmentAttempt  @relation(fields: [attemptId], references: [id])
+  question       AssessmentQuestion @relation(fields: [questionId], references: [id])
+}
+
+model Hub {
+  id        String        @id @default(uuid())
+  courseId  String
+  name      String
+  createdAt DateTime      @default(now())
+  course    Course        @relation(fields: [courseId], references: [id])
+  members   HubMember[]
+  requests  JoinRequest[]
+  messages  HubMessage[]
+  sessions  HubSession[]
+}
+
+model HubMember {
+  id        String   @id @default(uuid())
+  hubId     String
+  userId    String
+  role      String   @default("member") // owner, member
+  status    String   @default("active") // active, inactive
+  createdAt DateTime @default(now())
+  hub       Hub      @relation(fields: [hubId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([hubId, userId])
+}
+
+model JoinRequest {
+  id         String    @id @default(uuid())
+  hubId      String
+  userId     String
+  status     String    @default("pending") // pending, approved, rejected
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+  hub        Hub       @relation(fields: [hubId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+  
+  @@unique([hubId, userId])
+}
+
+model PeerConnection {
+  id              String   @id @default(uuid())
+  requesterUserId String
+  receiverUserId  String
+  courseId        String
+  status          String   @default("pending") // pending, accepted, rejected
+  createdAt       DateTime @default(now())
+  course          Course   @relation(fields: [courseId], references: [id])
+  requester       User     @relation("Requester", fields: [requesterUserId], references: [id])
+  receiver        User     @relation("Receiver", fields: [receiverUserId], references: [id])
+
+  @@unique([requesterUserId, receiverUserId, courseId])
+  @@index([courseId])
+  @@index([requesterUserId])
+  @@index([receiverUserId])
+}
+
+model MessageThread {
+  id        String   @id @default(uuid())
+  courseId  String
+  createdAt DateTime @default(now())
+  
+  participants MessageParticipant[]
+  messages     Message[]
+}
+
+model MessageParticipant {
+  id       String @id @default(uuid())
+  threadId String
+  userId   String
+  
+  thread   MessageThread @relation(fields: [threadId], references: [id])
+  user     User          @relation(fields: [userId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  threadId  String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  
+  thread    MessageThread @relation(fields: [threadId], references: [id])
+  sender    User          @relation("MessageSender", fields: [senderId], references: [id])
+}
+
+model HubMessage {
+  id        String   @id @default(uuid())
+  hubId     String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  
+  hub       Hub      @relation(fields: [hubId], references: [id])
+  sender    User     @relation("HubMessageSender", fields: [senderId], references: [id])
+}
+
+model HubSession {
+  id          String   @id @default(uuid())
+  hubId       String
+  title       String
+  scheduledAt DateTime
+  createdById String
+  
+  hub         Hub      @relation(fields: [hubId], references: [id])
+  createdBy   User     @relation("HubSessionCreator", fields: [createdById], references: [id])
+}
+
+model AIStudySession {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  pdfName   String?
+  pdfUrl    String?
+  status    String   @default("active") // active, completed
+  transcript String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+  scores    AIScore[]
+}
+
+model AIScore {
+  id                  String   @id @default(uuid())
+  sessionId           String
+  comprehensionScore  Int
+  implementationScore Int
+  integrationScore    Int
+  conceptGaps         Json     // Array of gap strings
+  createdAt           DateTime @default(now())
+  
+  session             AIStudySession @relation(fields: [sessionId], references: [id])
+}
+
+
