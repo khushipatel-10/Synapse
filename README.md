@@ -197,20 +197,3 @@ npm run dev
 ```
 
 ---
-
-## 📖 Usage
-
-**Backend:**
-```bash
-npm run dev         
-npm run build       
-npm run db:generate 
-npm run db:push    
-```
-
-**Frontend:**
-```bash
-npm run dev    
-```
----
-
