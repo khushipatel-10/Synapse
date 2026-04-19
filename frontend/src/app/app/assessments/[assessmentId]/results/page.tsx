@@ -2,24 +2,58 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, TrendingUp, TrendingDown, Layers, ArrowRight } from "lucide-react";
+import { Target, TrendingUp, TrendingDown, Layers, ArrowRight, Users } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
+
+interface PeerMatch {
+    user: { id: string; name: string };
+    matchScore: number;
+    vectorSimilarity: number;
+    technicalComplementarity: number;
+    details: { missingConcepts: string[] };
+}
 
 export default function AssessmentResultsPage() {
     const router = useRouter();
+    const { getToken } = useAuth();
     const [results, setResults] = useState<any>(null);
+    const [peers, setPeers] = useState<PeerMatch[]>([]);
+    const [peersLoading, setPeersLoading] = useState(false);
 
     useEffect(() => {
         const data = sessionStorage.getItem('lastAssessmentResult');
         if (data) {
-            // eslint-disable-next-line 
+            // eslint-disable-next-line
             setResults(JSON.parse(data));
         } else {
             router.push('/app/recommendations');
         }
     }, [router]);
+
+    useEffect(() => {
+        if (!results) return;
+        const fetchPeers = async () => {
+            setPeersLoading(true);
+            try {
+                const token = await getToken();
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/recommendations/me`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (json.success) {
+                    setPeers((json.data.topPairs || []).slice(0, 3));
+                }
+            } catch {
+                // silently fail — peer panel is non-critical
+            } finally {
+                setPeersLoading(false);
+            }
+        };
+        fetchPeers();
+    }, [results, getToken]);
 
     if (!results) return null;
 
@@ -95,7 +129,53 @@ export default function AssessmentResultsPage() {
                     </Card>
                 </div>
 
-                <div className="flex justify-center pt-8">
+                {/* Peer Suggestions Panel */}
+                <Card className="border border-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] bg-white rounded-2xl overflow-hidden">
+                    <div className="h-1 w-full bg-brand-teal/20 rounded-t-2xl" />
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-xl font-semibold text-charcoal">
+                            <Users className="w-5 h-5 text-brand-teal" /> Suggested Peers
+                        </CardTitle>
+                        <CardDescription className="text-muted-gray font-normal">
+                            Algorithmically matched based on your updated knowledge vector — vector similarity + concept complementarity + coaching profile.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {peersLoading ? (
+                            <div className="space-y-3">
+                                {[0, 1, 2].map(i => (
+                                    <div key={i} className="h-16 bg-black/5 rounded-xl animate-pulse" />
+                                ))}
+                            </div>
+                        ) : peers.length === 0 ? (
+                            <p className="text-sm text-muted-gray">No peer matches found yet — ensure other students have completed their assessments.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {peers.map((peer, idx) => (
+                                    <div key={peer.user.id} className="flex items-center gap-4 p-4 bg-black/[0.02] border border-black/5 rounded-xl">
+                                        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-brand-mint/30 text-brand-teal flex items-center justify-center font-bold text-sm">
+                                            {idx + 1}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-charcoal text-sm truncate">{peer.user.name}</p>
+                                            {peer.details.missingConcepts.length > 0 && (
+                                                <p className="text-xs text-muted-gray mt-0.5">
+                                                    Strong in: <span className="text-brand-teal font-medium">{peer.details.missingConcepts.slice(0, 2).join(', ')}</span>
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="flex-shrink-0 text-right">
+                                            <div className="text-lg font-black text-brand-teal">{Math.round(peer.matchScore * 100)}%</div>
+                                            <div className="text-xs text-muted-gray">match</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <div className="flex justify-center pt-4">
                     <Button size="lg" className="w-full md:w-auto h-14 px-8 text-lg rounded-xl shadow-[0_4px_14px_rgba(0,0,0,0.1)] transition-transform hover:-translate-y-0.5 bg-charcoal hover:bg-charcoal/90 text-white font-medium border-0" onClick={() => router.push('/app/recommendations')}>
                         View New Vectors & Matches <ArrowRight className="w-5 h-5 ml-2 text-white/70" />
                     </Button>

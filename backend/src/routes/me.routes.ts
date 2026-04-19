@@ -9,21 +9,12 @@ const prisma = new PrismaClient();
 router.get('/', requireAuth(), async (req: any, res: any) => {
     try {
         const clerkUserId = req.auth.userId;
-        if (!clerkUserId) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' });
-        }
+        if (!clerkUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-        const user = await prisma.user.findUnique({
-            where: { clerkId: clerkUserId }
-        });
+        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
+        if (!user) return res.status(404).json({ success: false, message: 'User not found in database' });
 
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found in database' });
-        }
-
-        const preferences = await prisma.userPreferences.findUnique({
-            where: { clerkUserId }
-        });
+        const preferences = await prisma.userPreferences.findUnique({ where: { clerkUserId } });
 
         res.json({
             success: true,
@@ -45,20 +36,28 @@ router.get('/', requireAuth(), async (req: any, res: any) => {
     }
 });
 
-// POST /me - Update user profile display name, major, and year
+// POST /me - Update name, email, username, major, year
 router.post('/', requireAuth(), async (req: any, res: any) => {
     try {
         const clerkUserId = req.auth.userId;
-        if (!clerkUserId) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' });
-        }
+        if (!clerkUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-        const { name, major, year } = req.body;
+        const { name, email, username, major, year } = req.body;
+
+        // Username uniqueness check
+        if (username) {
+            const existing = await prisma.user.findUnique({ where: { username } });
+            if (existing && existing.clerkId !== clerkUserId) {
+                return res.status(409).json({ success: false, message: 'Username already taken' });
+            }
+        }
 
         const updatedUser = await prisma.user.update({
             where: { clerkId: clerkUserId },
             data: {
                 ...(name && { name }),
+                ...(email !== undefined && { email }),
+                ...(username !== undefined && { username: username || null }),
                 ...(major && { major }),
                 ...(year && { year })
             }
@@ -74,54 +73,59 @@ router.post('/', requireAuth(), async (req: any, res: any) => {
 // GET /me/preferences
 router.get('/preferences', requireAuth(), async (req: any, res: any) => {
     try {
-        // Spec allowed for `?clerkId=XYZ` but we enforce the authorized user
         const clerkUserId = req.query.clerkId || req.auth.userId;
-        const prefs = await prisma.userPreferences.findUnique({
-            where: { clerkUserId }
-        });
+        const prefs = await prisma.userPreferences.findUnique({ where: { clerkUserId } });
         return res.json({ success: true, data: prefs });
     } catch (error: any) {
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// POST /me/preferences & PUT /me/preferences
+// POST/PUT /me/preferences
 const handlePreferences = async (req: any, res: any) => {
     try {
         const clerkUserId = req.auth.userId;
         const body = req.body;
+        if (!clerkUserId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-        if (!clerkUserId) {
-            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        // Username uniqueness check
+        if (body.username) {
+            const existing = await prisma.user.findUnique({ where: { username: body.username } });
+            if (existing && existing.clerkId !== clerkUserId) {
+                return res.status(409).json({ success: false, error: 'Username already taken' });
+            }
         }
 
-        // Update User object specifically for major and name
         await prisma.user.upsert({
             where: { clerkId: clerkUserId },
             update: {
                 ...(body.major && { major: body.major }),
-                ...(body.clerkUserName && { name: body.clerkUserName })
+                ...(body.clerkUserName && { name: body.clerkUserName }),
+                ...(body.email !== undefined && { email: body.email }),
+                ...(body.username !== undefined && { username: body.username || null })
             },
             create: {
                 clerkId: clerkUserId,
-                name: body.clerkUserName || "Synapse Scholar",
-                major: body.major || "",
-                year: "",
-                availability: "[]"
+                name: body.clerkUserName || 'Synapse Scholar',
+                email: body.email || null,
+                username: body.username || null,
+                major: body.major || '',
+                year: '',
+                availability: '[]'
             }
         });
 
         const prefsToUpdate = {
-            studyPace: body.preferences?.pace || "medium",
-            studyMode: body.preferences?.mode || "mixed",
-            learningStyle: "mixed",
-            goal: "learn",
+            studyPace: body.preferences?.pace || 'medium',
+            studyMode: body.preferences?.mode || 'mixed',
+            learningStyle: 'mixed',
+            goal: 'learn',
             subjectInterests: body.major ? [body.major] : [],
-            preferredGroupSize: body.preferences?.groupSize || "small",
+            preferredGroupSize: body.preferences?.groupSize || 'small',
             availability: null,
-            offlineOrOnline: body.preferences?.offlineOrOnline || "online",
-            timezone: body.preferences?.timezone || "UTC",
-            materialPreferred: body.preferences?.materialPreferred || "mixed"
+            offlineOrOnline: body.preferences?.offlineOrOnline || 'online',
+            timezone: body.preferences?.timezone || 'UTC',
+            materialPreferred: body.preferences?.materialPreferred || 'mixed'
         };
 
         const { PreferenceService } = await import('../services/preference.service');
@@ -136,8 +140,6 @@ const handlePreferences = async (req: any, res: any) => {
 
 router.post('/preferences', requireAuth(), handlePreferences);
 router.put('/preferences', requireAuth(), handlePreferences);
-
-// We keep /onboarding just in case the frontend relies on it
 router.post('/onboarding', requireAuth(), handlePreferences);
 
 export default router;

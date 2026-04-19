@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useEffect, useState, useRef } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Loader2, CheckCircle2, Clock } from "lucide-react";
+import { Users, Loader2, CheckCircle2, Clock, Search, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export default function ConnectionsPage() {
     const { getToken, isLoaded } = useAuth();
@@ -14,6 +16,13 @@ export default function ConnectionsPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [connections, setConnections] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Username search state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [connectingId, setConnectingId] = useState<string | null>(null);
+    const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         async function fetchConnections() {
@@ -51,6 +60,41 @@ export default function ConnectionsPage() {
         } catch (e) {
             console.error(e);
         }
+    };
+
+    const handleSearch = (q: string) => {
+        setSearchQuery(q);
+        if (searchTimeout.current) clearTimeout(searchTimeout.current);
+        if (q.trim().length < 2) { setSearchResults([]); return; }
+        searchTimeout.current = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API}/users/search?q=${encodeURIComponent(q)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) setSearchResults(data.data);
+            } catch (e) { console.error(e); }
+            finally { setSearching(false); }
+        }, 400);
+    };
+
+    const handleSearchConnect = async (userId: string) => {
+        setConnectingId(userId);
+        try {
+            const token = await getToken();
+            await fetch(`${API}/connections/request`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receiverId: userId })
+            });
+            setSearchResults(prev => prev.map(u => u.id === userId
+                ? { ...u, connection: { status: 'pending', isRequester: true } }
+                : u
+            ));
+        } catch (e) { console.error(e); }
+        finally { setConnectingId(null); }
     };
 
     const handleMessage = async (peerId: string) => {
@@ -95,6 +139,57 @@ export default function ConnectionsPage() {
                     <p className="text-lg text-muted-dark mt-2 font-normal">Manage your study partners and study group requests.</p>
                 </div>
             </div>
+
+            {/* Find by username */}
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold text-charcoal mb-4 flex items-center gap-2">
+                    <Search className="w-5 h-5 text-brand-teal" /> Find a Friend by Username
+                </h2>
+                <div className="relative max-w-md">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-gray font-medium text-sm">@</span>
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => handleSearch(e.target.value)}
+                        placeholder="Search username or name..."
+                        className="w-full pl-8 pr-4 py-3 border border-black/10 rounded-xl focus:border-brand-teal focus:ring-4 focus:ring-brand-teal/10 outline-none bg-white text-charcoal text-sm"
+                    />
+                    {searching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-gray" />}
+                </div>
+                {searchResults.length > 0 && (
+                    <div className="mt-3 space-y-2 max-w-md">
+                        {searchResults.map(u => (
+                            <div key={u.id} className="flex items-center gap-3 p-3 bg-white border border-black/5 rounded-xl shadow-sm">
+                                <div className="w-9 h-9 rounded-full bg-brand-teal/10 flex items-center justify-center font-semibold text-brand-teal text-sm shrink-0">
+                                    {u.name?.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-charcoal text-sm truncate">{u.name}</p>
+                                    {u.username && <p className="text-xs text-muted-gray">@{u.username}</p>}
+                                    {u.major && <p className="text-xs text-muted-gray">{u.major}</p>}
+                                </div>
+                                {!u.connection ? (
+                                    <Button size="sm" onClick={() => handleSearchConnect(u.id)} disabled={connectingId === u.id}
+                                        className="bg-brand-teal hover:bg-brand-teal/90 text-white rounded-xl border-0 shrink-0 text-xs px-3">
+                                        {connectingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><UserPlus className="w-3 h-3 mr-1" />Connect</>}
+                                    </Button>
+                                ) : u.connection.status === 'pending' ? (
+                                    <span className="text-xs text-muted-gray bg-black/5 px-3 py-1.5 rounded-lg shrink-0">
+                                        {u.connection.isRequester ? 'Pending' : 'Incoming'}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs text-brand-teal bg-brand-teal/10 px-3 py-1.5 rounded-lg shrink-0 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3" /> Connected
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+                    <p className="mt-3 text-sm text-muted-gray max-w-md">No users found for &quot;{searchQuery}&quot;. Make sure they have set a username in their profile.</p>
+                )}
+            </section>
 
             <div className="space-y-12">
                 {/* Active Connections */}

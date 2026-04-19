@@ -4,9 +4,6 @@ import { EmbeddingService } from './embedding.service';
 const prisma = new PrismaClient();
 
 export class AssessmentService {
-    /**
-     * Fetch all available assessments
-     */
     static async getAssessments() {
         return prisma.assessment.findMany({
             select: {
@@ -15,37 +12,27 @@ export class AssessmentService {
                 title: true,
                 description: true,
                 createdAt: true,
-                _count: {
-                    select: { questions: true }
-                }
+                _count: { select: { questions: true } }
             }
         });
     }
 
-    /**
-     * Fetch a specific assessment with its questions (excluding correct answers for security)
-     */
     static async getAssessmentById(assessmentId: string) {
         return prisma.assessment.findUnique({
             where: { id: assessmentId },
             include: {
                 questions: {
-                    select: {
-                        id: true,
-                        questionText: true,
-                        options: true,
-                        conceptName: true,
-                        difficulty: true
-                    }
+                    select: { id: true, questionText: true, options: true, conceptName: true, difficulty: true }
                 }
             }
         });
     }
 
-    /**
-     * Submit an assessment attempt, compute score, and update real skills
-     */
-    static async submitAssessment(clerkUserId: string, assessmentId: string, submission: { questionId: string, selectedAnswer: string }[]) {
+    static async submitAssessment(
+        clerkUserId: string,
+        assessmentId: string,
+        submission: { questionId: string; selectedAnswer: string }[]
+    ) {
         const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
         if (!user) throw new Error("User not found");
 
@@ -55,84 +42,105 @@ export class AssessmentService {
         });
         if (!assessment) throw new Error("Assessment not found");
 
-        // Prepare grading objects
+        // Grade each response
         let correctCount = 0;
-        const conceptStats: Record<string, { total: number, correct: number }> = {};
-        const responseData = [];
+        const conceptStats: Record<string, { total: number; correct: number; difficulty: string }> = {};
+        const responseData: { questionId: string; selectedAnswer: string; isCorrect: boolean }[] = [];
 
-        // Grade the submission
-        for (const [index, q] of assessment.questions.entries()) {
+        for (const q of assessment.questions) {
             if (!conceptStats[q.conceptName]) {
-                conceptStats[q.conceptName] = { total: 0, correct: 0 };
+                conceptStats[q.conceptName] = { total: 0, correct: 0, difficulty: q.difficulty };
             }
             conceptStats[q.conceptName].total += 1;
 
-            const submittedAnswer = submission.find(s => s.questionId === q.id)?.selectedAnswer || "";
+            const submittedAnswer = submission.find(s => s.questionId === q.id)?.selectedAnswer || '';
             const isCorrect = submittedAnswer === q.correctAnswer;
-
             if (isCorrect) {
                 correctCount += 1;
                 conceptStats[q.conceptName].correct += 1;
             }
 
-            responseData.push({
-                questionId: q.id,
-                selectedAnswer: submittedAnswer,
-                isCorrect
-            });
+            responseData.push({ questionId: q.id, selectedAnswer: submittedAnswer, isCorrect });
         }
 
         const overallScore = Math.round((correctCount / assessment.questions.length) * 100);
 
-        // Save Attempt
+        // Look up previous attempt to compute improvementRate
+        const previousAttempt = await prisma.assessmentAttempt.findFirst({
+            where: { clerkUserId, assessmentId },
+            orderBy: { createdAt: 'desc' }
+        });
+
         const attempt = await prisma.assessmentAttempt.create({
             data: {
                 clerkUserId,
                 assessmentId,
                 score: overallScore,
-                responses: {
-                    create: responseData
-                }
+                responses: { create: responseData }
             }
         });
 
-        // Resolve Hardcoded CS101 Course map (since MVP just has DSA assessment)
         const course = await prisma.course.findUnique({ where: { code: 'CS101' } });
-        if (!course) throw new Error("CS101 Course not found to map skills to.");
+        if (!course) throw new Error("CS101 Course not found");
 
-        // Update real ConceptPerformance rows
+        // Update ConceptPerformance per concept
+        const conceptPerformances: Record<string, number> = {};
         for (const [conceptName, stats] of Object.entries(conceptStats)) {
             const masteryScore = Math.round((stats.correct / stats.total) * 100);
+            conceptPerformances[conceptName] = masteryScore;
 
-            // Upsert doesn't work well without a unique constraint, so we manually check
-            const existingCP = await prisma.conceptPerformance.findFirst({
+            const existing = await prisma.conceptPerformance.findFirst({
                 where: { userId: user.id, courseId: course.id, conceptName }
             });
 
-            if (existingCP) {
+            if (existing) {
+                // Weighted blend: 60% new score, 40% old — prevents wild swings
+                const blended = Math.round(existing.masteryScore * 0.4 + masteryScore * 0.6);
                 await prisma.conceptPerformance.update({
-                    where: { id: existingCP.id },
-                    data: {
-                        masteryScore,
-                        attempts: existingCP.attempts + 1,
-                        lastPracticed: new Date()
-                    }
+                    where: { id: existing.id },
+                    data: { masteryScore: blended, attempts: existing.attempts + 1, lastPracticed: new Date() }
                 });
+                conceptPerformances[conceptName] = blended;
             } else {
                 await prisma.conceptPerformance.create({
-                    data: {
-                        userId: user.id,
-                        courseId: course.id,
-                        conceptName,
-                        masteryScore,
-                        attempts: 1,
-                        lastPracticed: new Date()
-                    }
+                    data: { userId: user.id, courseId: course.id, conceptName, masteryScore, attempts: 1, lastPracticed: new Date() }
                 });
             }
         }
 
-        // Generate/Update the overarching LearningState
+        // --- Compute meaningful LearningState values ---
+
+        // conceptEntropy: how uneven is mastery across concepts? (std dev / 50)
+        const scores = Object.values(conceptPerformances);
+        const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const variance = scores.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / scores.length;
+        const conceptEntropy = Math.min(1, Math.sqrt(variance) / 50);
+
+        // frustrationIndex: proportion of easy questions answered wrong (capped at 0.9)
+        const easyQs = assessment.questions.filter(q => q.difficulty === 'easy');
+        const easyWrong = responseData.filter(r => {
+            const q = assessment.questions.find(q => q.id === r.questionId);
+            return q?.difficulty === 'easy' && !r.isCorrect;
+        }).length;
+        const frustrationIndex = easyQs.length > 0
+            ? Math.min(0.9, (easyWrong / easyQs.length) * 0.9)
+            : 0.1;
+
+        // improvementRate: delta from last attempt / 10 to keep in reasonable range
+        const improvementRate = previousAttempt
+            ? Math.max(-5, Math.min(10, (overallScore - previousAttempt.score) / 10))
+            : 1.0;
+
+        // practiceSuccessScore tracks how well they do on application questions
+        const hardQs = assessment.questions.filter(q => q.difficulty === 'hard');
+        const hardCorrect = responseData.filter(r => {
+            const q = assessment.questions.find(q => q.id === r.questionId);
+            return q?.difficulty === 'hard' && r.isCorrect;
+        }).length;
+        const practiceSuccessScore = hardQs.length > 0
+            ? Math.round((hardCorrect / hardQs.length) * 100)
+            : overallScore;
+
         const existingState = await prisma.learningState.findFirst({
             where: { userId: user.id, courseId: course.id }
         });
@@ -144,6 +152,11 @@ export class AssessmentService {
                     averageScore: overallScore,
                     confidenceSelf: overallScore,
                     confidenceAi: overallScore,
+                    frustrationIndex,
+                    improvementRate,
+                    practiceSuccessScore,
+                    textSuccessScore: overallScore,
+                    conceptEntropy,
                     lastUpdated: new Date()
                 }
             });
@@ -155,41 +168,40 @@ export class AssessmentService {
                     confidenceSelf: overallScore,
                     confidenceAi: overallScore,
                     averageScore: overallScore,
-                    frustrationIndex: 0.1,
-                    improvementRate: 1.0,
+                    frustrationIndex,
+                    improvementRate,
                     videoSuccessScore: 50,
-                    textSuccessScore: 50,
-                    practiceSuccessScore: overallScore,
-                    conceptEntropy: 0.5
+                    textSuccessScore: overallScore,
+                    practiceSuccessScore,
+                    conceptEntropy
                 }
             });
         }
 
-        // CRITICAL PHASE 9 INTEGRATION: Automatically regenerate the user's vector embedding using the real skills
-        await EmbeddingService.regenerateEmbeddingsForCourse(course.id);
+        // Regenerate only this user's embedding (not the whole course)
+        await EmbeddingService.regenerateEmbeddingForUserCourse(user.id, course.id);
 
-        // Generate dynamic feedback
-        const weakConcepts = Object.entries(conceptStats)
-            .filter(([_, stats]) => (stats.correct / stats.total) <= 0.5)
+        const weaknesses = Object.entries(conceptStats)
+            .filter(([_, s]) => s.correct / s.total <= 0.5)
             .map(([name]) => name);
 
-        const strongConcepts = Object.entries(conceptStats)
-            .filter(([_, stats]) => (stats.correct / stats.total) === 1.0)
+        const strengths = Object.entries(conceptStats)
+            .filter(([_, s]) => s.correct / s.total >= 0.8)
             .map(([name]) => name);
 
         return {
-            success: true,
             score: overallScore,
             attemptId: attempt.id,
             totalQuestions: assessment.questions.length,
             correctCount,
-            feedback: {
-                weakConcepts,
-                strongConcepts,
-                recommendation: weakConcepts.length > 0
-                    ? `You should study ${weakConcepts.join(' and ')}.`
-                    : "Excellent work! You have strong foundational mastery."
-            }
+            strengths,
+            weaknesses,
+            conceptEntropy: Math.round(conceptEntropy * 100) / 100,
+            frustrationIndex: Math.round(frustrationIndex * 100) / 100,
+            improvementRate: Math.round(improvementRate * 100) / 100,
+            recommendation: weaknesses.length > 0
+                ? `Prioritise studying ${weaknesses.slice(0, 2).join(' and ')}. Your vector has been updated and peers who excel in these areas are now being surfaced.`
+                : 'Excellent — strong foundational mastery across all concepts assessed.'
         };
     }
 }

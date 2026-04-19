@@ -120,7 +120,7 @@ export default function CommunityHubsPage() {
                     onClick={() => setIsCreating(true)}
                     className="rounded-xl bg-charcoal text-white shadow-[0_4px_14px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)] transition-all hover:-translate-y-0.5 border-0 font-medium"
                 >
-                    <PlusCircle className="w-4 h-4 mr-2" /> Request New Hub
+                    <PlusCircle className="w-4 h-4 mr-2" /> Add New Hub
                 </Button>
             </div>
 

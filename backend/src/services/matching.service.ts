@@ -282,17 +282,57 @@ export class MatchingService {
     }
 
     /**
-     * Phase 8: Builds personalized recommendations for a specific user incorporating vector math + user preferences
+     * Computes a normalized AI coaching score [0-1] for a user based on their AIScore history.
+     * Higher = student demonstrates strong independent reasoning ability.
+     */
+    static async getAICoachingScore(userId: string): Promise<number> {
+        const sessions = await prisma.aIStudySession.findMany({
+            where: { userId, status: 'completed' },
+            include: { scores: true },
+            orderBy: { createdAt: 'desc' },
+            take: 5
+        });
+
+        if (sessions.length === 0) return 0.5; // neutral if no session history
+
+        const scoredSessions = sessions.filter(s => s.scores.length > 0);
+        if (scoredSessions.length === 0) return 0.5;
+
+        // Average across recent sessions, weighting comprehension most heavily
+        const avg = scoredSessions.reduce((sum, s) => {
+            const sc = s.scores[0];
+            return sum + (sc.comprehensionScore * 0.5 + sc.implementationScore * 0.3 + sc.integrationScore * 0.2);
+        }, 0) / scoredSessions.length;
+
+        return Math.min(1, avg / 100);
+    }
+
+    /**
+     * Computes how complementary two users' AI coaching scores are.
+     * A student who scores high in areas the other scores low → high AI complementarity.
+     */
+    static async getAIComplementarityScore(userAId: string, userBId: string): Promise<number> {
+        const [scoreA, scoreB] = await Promise.all([
+            MatchingService.getAICoachingScore(userAId),
+            MatchingService.getAICoachingScore(userBId)
+        ]);
+        // Max complementarity when one is strong and one is weaker → pairing benefits both
+        return Math.abs(scoreA - scoreB);
+    }
+
+    /**
+     * Builds personalized recommendations for a specific user incorporating:
+     * - Vector knowledge similarity (35%)
+     * - Structural concept complementarity (35%)
+     * - AI coaching score complementarity (15%)
+     * - Human preference compatibility (15%)
      */
     static async buildPersonalizedRecommendations(clerkUserId: string, courseId: string, userPrefs: any) {
         const dbUser = await prisma.user.findFirst({ where: { clerkId: clerkUserId } });
         if (!dbUser) throw new Error("Database user mapping not found for Clerk ID");
 
-        // 1. Get Top 20 physically similar/complementary users via existing pgvector workflow
         let vectorMatches = await SimilarityService.getSimilarUsers(dbUser.id, courseId, 20);
 
-        // FALLBACK: If vectorMatches is empty (no seeds generated/no assessment taken),
-        // we'll pull a random sampling of the course and match them manually on preference score to keep app completely dynamic.
         if (vectorMatches.length === 0) {
             const fallbackUsers = await prisma.user.findMany({
                 where: { id: { not: dbUser.id } },
@@ -301,8 +341,8 @@ export class MatchingService {
             vectorMatches = fallbackUsers.map(u => ({
                 userId: u.id,
                 name: u.name,
-                distance: 1, // Neutral
-                similarityScore: 0.5, // Neutral fallback
+                distance: 1,
+                similarityScore: 0.5,
                 embeddingVersion: null
             }));
         }
@@ -315,27 +355,30 @@ export class MatchingService {
 
             const candidatePrefs = await PreferenceService.getPreferences(candidateDb.clerkId);
 
-            // 2. Extract technical complementarity (try/catch in case seeds are totally stripped)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let compData: any = { complementarityScore: 0.5, details: { missingConcepts: [], topComplementaryConcepts: [] } };
             try {
                 compData = await ComplementarityService.computeMatchScore(dbUser.id, candidateDb.id, courseId);
-            } catch (e) { /* ignore fallback */ }
+            } catch (e) { /* ignore */ }
 
-            // 3. Extract human preference compatibility
             const prefScore = this.computePreferenceCompatibility(userPrefs, candidatePrefs);
 
-            // 4. Calculate Master Synergistic Score
-            // Weighting: 40% Vector Knowledge, 40% Structural Complementarity, 20% Human Preferences
-            const masterScore = (match.similarityScore * 0.4) + (compData.complementarityScore * 0.4) + (prefScore * 0.2);
+            // AI coaching complementarity: measures whether one can teach the other
+            const aiCompScore = await MatchingService.getAIComplementarityScore(dbUser.id, candidateDb.id);
+
+            // Master Synergistic Score — 35/35/15/15 weighting
+            const masterScore =
+                (match.similarityScore * 0.35) +
+                (compData.complementarityScore * 0.35) +
+                (aiCompScore * 0.15) +
+                (prefScore * 0.15);
 
             recommendations.push({
                 user: candidateDb,
                 matchScore: masterScore,
                 vectorSimilarity: match.similarityScore,
                 technicalComplementarity: compData.complementarityScore,
+                aiCoachingComplementarity: aiCompScore,
                 preferenceCompatibility: prefScore,
-                // Pass standard interface even on fallback
                 details: {
                     missingConcepts: compData.details?.topComplementaryConcepts || []
                 },
@@ -346,7 +389,6 @@ export class MatchingService {
             });
         }
 
-        // Sort by absolute highest master score
         return recommendations.sort((a, b) => b.matchScore - a.matchScore).slice(0, 10);
     }
 }

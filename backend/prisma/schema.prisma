@@ -13,6 +13,8 @@ model User {
   id                  String               @id @default(uuid())
   clerkId             String?              @unique
   name                String
+  email               String?
+  username            String?              @unique
   major               String?
   year                String?
   availability        Json?
@@ -28,6 +30,7 @@ model User {
   connectionsReceived  PeerConnection[]     @relation("Receiver")
   messageParticipants  MessageParticipant[]
   messagesSent         Message[]            @relation("MessageSender")
+  peerStudySessions    PeerStudySession[]
   hubMessages          HubMessage[]         @relation("HubMessageSender")
   hubSessionsCreated   HubSession[]         @relation("HubSessionCreator")
   aiStudySessions      AIStudySession[]
@@ -252,9 +255,22 @@ model MessageThread {
   id        String   @id @default(uuid())
   courseId  String
   createdAt DateTime @default(now())
-  
+
   participants MessageParticipant[]
   messages     Message[]
+  sessions     PeerStudySession[]
+}
+
+model PeerStudySession {
+  id          String   @id @default(uuid())
+  threadId    String
+  createdById String
+  title       String
+  scheduledAt DateTime
+  createdAt   DateTime @default(now())
+
+  thread      MessageThread @relation(fields: [threadId], references: [id])
+  createdBy   User          @relation(fields: [createdById], references: [id])
 }
 
 model MessageParticipant {
@@ -305,11 +321,13 @@ model AIStudySession {
   courseId  String
   pdfName   String?
   pdfUrl    String?
+  pdfText   String?
+  messages  Json?
   status    String   @default("active") // active, completed
   transcript String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   user      User     @relation(fields: [userId], references: [id])
   course    Course   @relation(fields: [courseId], references: [id])
   scores    AIScore[]

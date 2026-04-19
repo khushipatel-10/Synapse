@@ -24,9 +24,15 @@ router.get('/me', requireAuth(), async (req: any, res: any) => {
         }
         const courseId = course.id;
 
-        const prefs = await PreferenceService.getPreferences(clerkId);
+        let prefs = await PreferenceService.getPreferences(clerkId);
         if (!prefs) {
-            return res.status(404).json({ success: false, error: 'User preferences not found. Please complete onboarding.' });
+            // Use neutral defaults so matching still works without onboarding
+            prefs = {
+                clerkUserId: clerkId, studyPace: 'moderate', studyMode: 'hybrid',
+                learningStyle: 'mixed', goal: 'mastery', subjectInterests: [],
+                preferredGroupSize: 'small', offlineOrOnline: 'online',
+                timezone: 'UTC', materialPreferred: 'mixed'
+            } as any;
         }
 
         // Leveraging existing backend architecture

@@ -109,6 +109,60 @@ export class MessageService {
     }
 
     /**
+     * Schedule a study session tied to a thread
+     */
+    static async scheduleSession(threadId: string, clerkUserId: string, title: string, scheduledAt: Date) {
+        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
+        if (!user) throw new Error('User not found');
+
+        const thread = await prisma.messageThread.findFirst({
+            where: { id: threadId, participants: { some: { userId: user.id } } }
+        });
+        if (!thread) throw new Error('Thread not found or unauthorized');
+
+        const session = await (prisma as any).peerStudySession.create({
+            data: { threadId, createdById: user.id, title, scheduledAt }
+        });
+        return session;
+    }
+
+    /**
+     * Get all scheduled sessions for a thread
+     */
+    static async getThreadSessions(threadId: string, clerkUserId: string) {
+        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
+        if (!user) throw new Error('User not found');
+
+        const thread = await prisma.messageThread.findFirst({
+            where: { id: threadId, participants: { some: { userId: user.id } } }
+        });
+        if (!thread) throw new Error('Thread not found or unauthorized');
+
+        return (prisma as any).peerStudySession.findMany({
+            where: { threadId },
+            include: { createdBy: { select: { id: true, name: true } } },
+            orderBy: { scheduledAt: 'asc' }
+        });
+    }
+
+    /**
+     * Get full thread info (participants) for displaying peer name in thread header
+     */
+    static async getThreadInfo(threadId: string, clerkUserId: string) {
+        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
+        if (!user) throw new Error('User not found');
+
+        const thread = await prisma.messageThread.findFirst({
+            where: { id: threadId, participants: { some: { userId: user.id } } },
+            include: { participants: { include: { user: { select: { id: true, name: true, username: true } } } } }
+        });
+        if (!thread) throw new Error('Thread not found or unauthorized');
+
+        const peer = thread.participants.find(p => p.userId !== user.id)?.user || null;
+        return { id: thread.id, peer };
+    }
+
+    /**
      * Send a message in a thread
      */
     static async sendMessage(threadId: string, clerkUserId: string, content: string) {

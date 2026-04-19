@@ -13,6 +13,7 @@ import assessmentRoutes from './routes/assessment.routes';
 import connectionRoutes from './routes/connection.routes';
 import messageRoutes from './routes/message.routes';
 import learnRoutes from './routes/learn.routes';
+import userRoutes from './routes/user.routes';
 import { authMiddleware } from './middleware/auth';
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.use('/api/v1/assessments', assessmentRoutes);
 app.use('/api/v1/connections', connectionRoutes);
 app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/learn', learnRoutes);
+app.use('/api/v1/users', userRoutes);
 
 app.listen(PORT, () => {
     console.log(`🚀 Server initialized on http://localhost:${PORT}`);

@@ -11,8 +11,10 @@ export default function ProfilePage() {
     const { getToken, isLoaded } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [saveMsg, setSaveMsg] = useState('');
     const [formData, setFormData] = useState({
         fullName: '',
+        username: '',
         contactEmail: '',
         avatarUrl: '',
         major: '',
@@ -38,6 +40,7 @@ export default function ProfilePage() {
                     if (data.success && data.data) {
                         setFormData({
                             fullName: data.data.name || '',
+                            username: data.data.username || '',
                             contactEmail: data.data.email || '',
                             avatarUrl: data.data.avatar || '',
                             major: data.data.major || '',
@@ -71,6 +74,8 @@ export default function ProfilePage() {
                 },
                 body: JSON.stringify({
                     clerkUserName: formData.fullName,
+                    email: formData.contactEmail,
+                    username: formData.username || null,
                     major: formData.major,
                     preferences: {
                         pace: formData.learningPace,
@@ -83,10 +88,13 @@ export default function ProfilePage() {
                 })
             });
 
-            if (res.ok) {
-                alert("Preferences updated successfully.");
+            const json = await res.json();
+            if (res.ok && json.success) {
+                setSaveMsg('Saved successfully.');
+                setTimeout(() => setSaveMsg(''), 3000);
             } else {
-                alert("Failed to update preferences.");
+                setSaveMsg(json.error || json.message || 'Failed to save.');
+                setTimeout(() => setSaveMsg(''), 4000);
             }
         } catch (e) {
             console.error(e);
@@ -140,6 +148,19 @@ export default function ProfilePage() {
                                             onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                             placeholder="Your full name"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold text-muted-gray uppercase tracking-wider block mb-1">Username <span className="text-brand-teal normal-case font-normal">(unique — friends can find you by this)</span></label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-gray font-medium">@</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-7 pr-3 py-3 border border-black/10 rounded-xl focus:border-brand-teal focus:ring-4 focus:ring-brand-teal/10 outline-none bg-white text-muted-dark"
+                                                value={formData.username}
+                                                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                                                placeholder="yourhandle"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-muted-gray uppercase tracking-wider block mb-1">Contact Email</label>
@@ -286,7 +307,12 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
 
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex items-center justify-end gap-4">
+                    {saveMsg && (
+                        <span className={`text-sm font-medium ${saveMsg.includes('success') || saveMsg.includes('Saved') ? 'text-brand-teal' : 'text-red-500'}`}>
+                            {saveMsg}
+                        </span>
+                    )}
                     <Button onClick={handleSave} disabled={saving} className="px-6 py-5 rounded-xl bg-charcoal hover:bg-charcoal/90 text-white shadow-[0_4px_14px_rgba(0,0,0,0.1)] transition-transform hover:-translate-y-0.5 border-0 font-medium">
                         {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                         Save Changes
