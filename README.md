@@ -6,14 +6,10 @@
 
 ## ✨ Key Features
 
-<div align="center">
-  <img src="https://drive.google.com/uc?export=view&id=1MHgFUJ8THWzt-4Rk8X0t4g6AjF0V-22d" alt="Dashboard" width="49.5%">
-  <img src="https://drive.google.com/uc?export=view&id=1qjZzLxtguwoLH7EoNiHPSMBcDJNFoJ2V" alt="Recommendations page" width="49.5%">
-</div>
-
-<div align="center">
-  <p><strong>Main Dashboard</strong> &nbsp; &nbsp; <strong>Recommendations Interface</strong></p>
-</div>
+| | |
+|---|---|
+| ![Dashboard](https://drive.google.com/uc?export=view&id=1MHgFUJ8THWzt-4Rk8X0t4g6AjF0V-22d) | ![Recommendations](https://drive.google.com/uc?export=view&id=1qjZzLxtguwoLH7EoNiHPSMBcDJNFoJ2V) |
+| **Main Dashboard** | **Recommendations Interface** |
 
 ### 🎯 Diagnostic Peer Matching
 - Advanced matching algorithm that pairs complementary learners
