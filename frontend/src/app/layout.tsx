@@ -1,5 +1,11 @@
 import { ClerkProvider } from '@clerk/nextjs'
+import type { Metadata } from 'next'
 import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Synapse — AI-Powered Peer Learning',
+  description: 'Find your ideal study partner through vector-based knowledge matching.',
+}
 
 export default function RootLayout({
   children,

@@ -18,7 +18,7 @@ export function PageShell({ children }: PageShellProps) {
                     style={{ background: 'radial-gradient(circle, rgba(74,140,66,0.04), transparent)' }} />
             </div>
 
-            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8 flex-1 relative z-10">
+            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pb-24 md:pb-10 space-y-8 flex-1 relative z-10">
                 {children}
             </div>
         </div>

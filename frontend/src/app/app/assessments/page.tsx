@@ -168,7 +168,7 @@ export default function AssessmentsIndexPage() {
                     style={{ background: '#DBE2EF', color: '#3F72AF', border: '1px solid #b8c8df' }}>
                     <Target className="w-3.5 h-3.5" /> Knowledge Diagnostics
                 </div>
-                <h1 className="text-4xl sm:text-5xl font-black text-charcoal tracking-tight" style={{ color: '#112D4E' }}>
+                <h1 className="text-4xl sm:text-5xl font-black tracking-tight" style={{ color: '#112D4E' }}>
                     Skill Assessments
                 </h1>
                 <p className="mt-3 text-lg max-w-2xl mx-auto font-normal leading-relaxed" style={{ color: '#2b4a70' }}>

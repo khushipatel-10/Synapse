@@ -4,6 +4,16 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { useNotifications } from "@/context/NotificationsContext";
+import { Users, LayoutGrid, BookOpen, Sparkles, MessageCircle, Star } from "lucide-react";
+
+const MOBILE_LINKS = [
+    { href: "/app/recommendations", label: "Matches",     Icon: Star },
+    { href: "/app/assessments",     label: "Assess",      Icon: BookOpen },
+    { href: "/app/community",       label: "Community",   Icon: LayoutGrid },
+    { href: "/app/connections",     label: "Connect",     Icon: Users,         badge: "connections" },
+    { href: "/app/messages",        label: "Messages",    Icon: MessageCircle, badge: "messages" },
+    { href: "/app/learn",           label: "AI Coach",    Icon: Sparkles },
+];
 
 function NavBadge({ count }: { count: number }) {
     if (count === 0) return null;
@@ -37,6 +47,30 @@ export default function NavBar() {
     };
 
     return (
+        <>
+        {/* Mobile bottom nav */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center h-16 border-t"
+            style={{ background: 'rgba(249,247,247,0.98)', backdropFilter: 'blur(14px)', borderColor: '#DBE2EF' }}>
+            {MOBILE_LINKS.map(({ href, label, Icon, badge }) => {
+                const active = pathname.startsWith(href);
+                const count = badge ? (badgeCounts[badge] ?? 0) : 0;
+                return (
+                    <Link key={href} href={href}
+                        className="relative flex flex-col items-center gap-0.5 px-2 py-1"
+                        style={{ color: active ? '#3F72AF' : '#6b84a0' }}>
+                        <Icon className="w-5 h-5" />
+                        <span className="text-[10px] font-semibold">{label}</span>
+                        {count > 0 && (
+                            <span className="absolute -top-0.5 right-0.5 min-w-[14px] h-3.5 px-1 text-white text-[8px] font-black rounded-full flex items-center justify-center"
+                                style={{ background: '#be123c' }}>
+                                {count > 9 ? '9+' : count}
+                            </span>
+                        )}
+                    </Link>
+                );
+            })}
+        </nav>
+
         <nav className="sticky top-0 z-40 w-full"
             style={{
                 background: 'rgba(249,247,247,0.96)',
@@ -90,5 +124,6 @@ export default function NavBar() {
                 </div>
             </div>
         </nav>
+        </>
     );
 }

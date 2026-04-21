@@ -79,7 +79,7 @@ export default function RecommendationsPage() {
                 {user && (
                     <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl border hover-lift"
                         style={{ borderColor: '#DBE2EF' }}>
-                        <img src={user.imageUrl} alt="" className="w-9 h-9 rounded-xl" />
+                        <img src={user.imageUrl} alt={user.firstName || 'User'} className="w-9 h-9 rounded-xl" />
                         <div>
                             <p className="font-black text-sm leading-none" style={{ color: '#112D4E' }}>{user.firstName}</p>
                             <p className="text-xs mt-0.5" style={{ color: '#6b84a0' }}>Active Learner</p>
