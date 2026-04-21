@@ -19,7 +19,7 @@
 
 | | |
 |---|---|
-| ![Screenshot 1](https://drive.google.com/file/d/1dtLP0S-h4nTFHovwSsn7etxqwhRt2tiK/view?usp=drive_link) | ![Screenshot 2](https://drive.google.com/uc?export=view&id=1qVhY8edXQL1nm9EzC7_mJxpi5FT8cSH-) |
+| ![Screenshot 1](https://drive.google.com/uc?export=view&id=1dtLP0S-h4nTFHovwSsn7etxqwhRt2tiK) | ![Screenshot 2](https://drive.google.com/uc?export=view&id=1qVhY8edXQL1nm9EzC7_mJxpi5FT8cSH-) |
 | **Landing Page** | **Recommendations** |
 
 </div>
