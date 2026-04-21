@@ -12,7 +12,7 @@ const inputBase: React.CSSProperties = {
     fontSize: '14px',
 };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
     return (
         <div className="space-y-1.5">
             <label className="text-xs font-black uppercase tracking-widest block" style={{ color: '#6b84a0' }}>{label}</label>
