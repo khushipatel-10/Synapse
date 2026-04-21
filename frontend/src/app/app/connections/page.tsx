@@ -66,7 +66,7 @@ function ProfileCardModal({ peerId, onClose, onAccept, onDecline }: {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {profile?.strongConcepts?.length > 0 && (
+                            {( profile?.strongConcepts?.length ?? 0) > 0 && (
                                 <div>
                                     <h4 className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5"
                                         style={{ color: '#4a8c42' }}>
