@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+
 import embeddingRoutes from './routes/embedding.routes';
 import similarityRoutes from './routes/similarity.routes';
 import matchRoutes from './routes/match.routes';

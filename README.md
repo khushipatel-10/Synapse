@@ -1,3 +1,5 @@
+<div align="center">
+
 # 🧠 Synapse — AI-Powered Peer Learning
 
 > Vector-based peer matching that finds the study partner who knows exactly what you don't.
@@ -7,6 +9,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
 
+</div>
+
 ---
 
 ## ✨ Screenshots
@@ -15,7 +19,7 @@
 
 | | |
 |---|---|
-| ![Screenshot 1](https://drive.google.com/file/d/1feXTjdK0yT6IpGmRJGqHVFkEkskC9R0p/view?usp=sharing) | ![Screenshot 2](https://drive.google.com/file/d/1qVhY8edXQL1nm9EzC7_mJxpi5FT8cSH-/view?usp=sharing) |
+| ![Screenshot 1](https://drive.google.com/uc?export=view&id=1feXTjdK0yT6IpGmRJGqHVFkEkskC9R0p) | ![Screenshot 2](https://drive.google.com/uc?export=view&id=1qVhY8edXQL1nm9EzC7_mJxpi5FT8cSH-) |
 | **Landing Page** | **Recommendations** |
 
 </div>
