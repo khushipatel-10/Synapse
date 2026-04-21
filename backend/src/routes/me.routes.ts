@@ -11,8 +11,20 @@ router.get('/', requireAuth(), async (req: any, res: any) => {
         const clerkUserId = req.auth.userId;
         if (!clerkUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
-        if (!user) return res.status(404).json({ success: false, message: 'User not found in database' });
+        let user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    clerkId: clerkUserId,
+                    name: 'Synapse Scholar',
+                    email: null,
+                    username: null,
+                    major: 'Computer Science',
+                    year: '',
+                    availability: '[]'
+                }
+            });
+        }
 
         const preferences = await prisma.userPreferences.findUnique({ where: { clerkUserId } });
 

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { EmbeddingService } from './embedding.service';
+import { getOrCreateUser } from '../utils/getOrCreateUser';
 
 const prisma = new PrismaClient();
 
@@ -33,8 +34,7 @@ export class AssessmentService {
         assessmentId: string,
         submission: { questionId: string; selectedAnswer: string }[]
     ) {
-        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
-        if (!user) throw new Error("User not found");
+        const user = await getOrCreateUser(clerkUserId);
 
         const assessment = await prisma.assessment.findUnique({
             where: { id: assessmentId },

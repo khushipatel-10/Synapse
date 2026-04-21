@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getOrCreateUser } from '../utils/getOrCreateUser';
 
 const prisma = new PrismaClient();
 
@@ -56,8 +57,7 @@ export class CommunityService {
      * Creates a join request. Approves automatically if hub has capacity (< 4).
      */
     static async joinHub(hubId: string, clerkUserId: string) {
-        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
-        if (!user) throw new Error("User not found");
+        const user = await getOrCreateUser(clerkUserId);
 
         const hub = await prisma.hub.findUnique({
             where: { id: hubId },
@@ -98,8 +98,7 @@ export class CommunityService {
      * Leaves a hub or cancels a request.
      */
     static async leaveHub(hubId: string, clerkUserId: string) {
-        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
-        if (!user) throw new Error("User not found");
+        const user = await getOrCreateUser(clerkUserId);
 
         // Remove active member
         await prisma.hubMember.deleteMany({
@@ -118,8 +117,7 @@ export class CommunityService {
      * Creates a new physical hub and makes the creator an active member immediately.
      */
     static async createHub(courseId: string, clerkUserId: string, name: string) {
-        const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
-        if (!user) throw new Error("User not found");
+        const user = await getOrCreateUser(clerkUserId);
 
         const hub = await prisma.hub.create({
             data: {
