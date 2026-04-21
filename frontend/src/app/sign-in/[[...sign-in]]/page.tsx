@@ -15,8 +15,7 @@ export default function Page() {
                             card: "shadow-none p-0 bg-transparent"
                         }
                     }}
-                    afterSignInUrl="/app"
-                    redirectUrl="/app"
+                    fallbackRedirectUrl="/app/recommendations"
                 />
             </div>
         </div>
