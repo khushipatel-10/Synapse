@@ -22,10 +22,10 @@
         "pdf-parse": "^1.1.1"
     },
     "devDependencies": {
-        "@types/cors": "^2.8.17",
-        "@types/express": "^4.17.21",
-        "@types/multer": "^2.0.0",
-        "@types/node": "^20.19.33",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^4.17.25",
+        "@types/multer": "^2.1.0",
+        "@types/node": "^20.19.39",
         "@types/pdf-parse": "^1.1.5",
         "prisma": "^5.10.0",
         "ts-node": "^10.9.2",
